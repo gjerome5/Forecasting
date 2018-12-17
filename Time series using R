@@ -1,0 +1,69 @@
+# R code
+# installing necessary packages
+library(forecast)
+library(tseries)
+library(ggplot2)
+
+# import dataset
+RS<-read.csv("ROAD_SOUTH.csv")
+View(RS)
+
+#Eliminating NA 
+na.omit(RS)
+
+# summarizing the variables
+summary(RS)
+
+# Creating time series data
+tsdata1<-ts(RS$Look,start=c(2014,1),end=c(2018,11),frequency=12)
+autoplot(tsdata1)
+autoplot(decompose(tsdata1))
+adf.test(tsdata1)
+
+# splitting train and test dataset
+train <- window(tsdata1, end=c(2017,12))
+test <- window(tsdata1, start=c(2018,1))
+h <- length(test)
+# Model train
+ETS <- forecast(ets(train), h=13)
+ETS_ANA <- forecast(ets(train, model = "ANA"),h=13)
+ARIMA <- forecast(auto.arima(train, lambda=0), h=13)
+STL <- stlf(train, lambda=0, h=13)
+NN<-forecast(nnetar(train,lambda =  0.5),h=13)
+NN1<-forecast(nnetar(train,P = 1, repeats =20,lambda =  0.5),h=13)
+step <- forecast(auto.arima(train, stepwise=FALSE, approximation=FALSE),h=13)
+holt_train <- forecast(HoltWinters(train, beta=FALSE, gamma=FALSE),h=13)
+holt_train1 <- forecast(HoltWinters(train, gamma=FALSE),h=13)
+
+
+X <- cbind(ETS=ETS$mean, ARIMA=ARIMA$mean, STL=STL$mean,NN=NN$mean,
+           NN1=NN1$mean,ETS_ANA=ETS_ANA$mean,
+           step=step$mean,
+           holt_train=holt_train$mean,
+           holt_train1=holt_train1$mean)
+df <- cbind(tsdata1, X)
+colnames(df) <- c("Data","ETS","ARIMA","STL","NN","NN1","ETS_ANA","step","holt_train","holt_train1")
+
+# Data visualization
+autoplot(df) +
+  xlab("Year") + ylab(expression("West palm Lead"[2]))
+
+# Checking accuracy with RMSE
+mse2 <- c(ETS=mean((test-ETS$mean)^2),
+          ARIMA=mean((test-ARIMA$mean)^2),
+          STL=mean((test-STL$mean)^2),
+          NN=mean((test-NN$mean)^2),
+          NN1=mean((test-NN1$mean)^2),
+          ETS_ANA=mean((test-ETS_ANA$mean)^2),
+          step=mean((test-step$mean)^2),
+          holt_train=mean((test-holt_train$mean)^2),
+          holt_train1=mean((test-holt_train1$mean)^2))
+
+round(mse2,2)
+min(round(mse2,2))
+
+# forecast using actual dataset
+STL_Actual <- stlf(tsdata1, lambda=0, h=13)
+autoplot(STL_Actual)
+output<-data.frame(STL_Actual$mean)
+View(output)
